@@ -25,7 +25,8 @@ const client = new MongoClient(uri, {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", 
+    origin: ["http://localhost:5173", "https://task-management-d4708.web.app"], 
+    
     credentials: true,
   },
 });
@@ -88,13 +89,29 @@ app.delete("/tasks/:id", async (req, res) => {
   res.json(result);
 });
 
-app.get("/activities", async (req, res) => {
-  const activities = await activityCollection.find({}).toArray();
+// Middleware to verify JWT and extract user email
+const authenticateJWT = (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) {
+    return res.sendStatus(403);
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.sendStatus(403);
+    }
+    req.user = user;
+    next();
+  });
+};
+
+app.get("/activities", authenticateJWT, async (req, res) => {
+  const activities = await activityCollection.find({ userEmail: req.user.email }).toArray();
   res.json(activities);
 });
 
-app.post("/activities", async (req, res) => {
-  const activity = req.body;
+app.post("/activities", authenticateJWT, async (req, res) => {
+  const activity = { ...req.body, userEmail: req.user.email };
   const result = await activityCollection.insertOne(activity);
   res.json(result);
 });
