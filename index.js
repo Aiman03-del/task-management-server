@@ -8,7 +8,7 @@ const jwt = require("jsonwebtoken");
 
 const app = express();
 app.use(cors({
-  origin: "http://localhost:5173", 
+  origin: ["http://localhost:5173", "https://task-management-d4708.web.app"], 
   credentials: true,
 }));
 app.use(express.json());
@@ -36,14 +36,12 @@ let activityCollection;
 
 async function run() {
   try {
-    await client.connect();
     taskCollection = client.db("taskManagement").collection("tasks");
     activityCollection = client.db("taskManagement").collection("activities");
     const changeStream = taskCollection.watch();
     changeStream.on("change", (change) => {
       io.emit("taskChange", change);
     });
-    await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } catch (error) {
     console.error(error);
@@ -56,37 +54,42 @@ app.get("/", (req, res) => {
   res.send("Task Management API is Running");
 });
 
-app.get("/tasks", async (req, res) => {
-  const tasks = await taskCollection.find({}).toArray();
-  res.json(tasks);
+app.get("/tasks", (req, res) => {
+  taskCollection.find({}).toArray()
+    .then(tasks => res.json(tasks))
+    .catch(error => res.status(500).json({ error: error.message }));
 });
 
-app.get("/tasks/:userEmail", async (req, res) => {
+app.get("/tasks/:userEmail", (req, res) => {
   const { userEmail } = req.params;
-  const tasks = await taskCollection.find({ userEmail }).toArray();
-  res.json(tasks);
+  taskCollection.find({ userEmail }).toArray()
+    .then(tasks => res.json(tasks))
+    .catch(error => res.status(500).json({ error: error.message }));
 });
 
-app.post("/tasks", async (req, res) => {
+app.post("/tasks", (req, res) => {
   const task = req.body;
-  const result = await taskCollection.insertOne(task);
-  res.json(result);
+  taskCollection.insertOne(task)
+    .then(result => res.json(result))
+    .catch(error => res.status(500).json({ error: error.message }));
 });
 
-app.put("/tasks/:id", async (req, res) => {
+app.put("/tasks/:id", (req, res) => {
   const { id } = req.params;
   const updatedTask = req.body;
-  const result = await taskCollection.updateOne(
+  taskCollection.updateOne(
     { _id: new ObjectId(id) },
     { $set: updatedTask }
-  );
-  res.json(result);
+  )
+    .then(result => res.json(result))
+    .catch(error => res.status(500).json({ error: error.message }));
 });
 
-app.delete("/tasks/:id", async (req, res) => {
+app.delete("/tasks/:id", (req, res) => {
   const { id } = req.params;
-  const result = await taskCollection.deleteOne({ _id: new ObjectId(id) });
-  res.json(result);
+  taskCollection.deleteOne({ _id: new ObjectId(id) })
+    .then(result => res.json(result))
+    .catch(error => res.status(500).json({ error: error.message }));
 });
 
 // Middleware to verify JWT and extract user email
@@ -105,26 +108,30 @@ const authenticateJWT = (req, res, next) => {
   });
 };
 
-app.get("/activities", authenticateJWT, async (req, res) => {
-  const activities = await activityCollection.find({ userEmail: req.user.email }).toArray();
-  res.json(activities);
+app.get("/activities", authenticateJWT, (req, res) => {
+  activityCollection.find({ userEmail: req.user.email }).toArray()
+    .then(activities => res.json(activities))
+    .catch(error => res.status(500).json({ error: error.message }));
 });
 
-app.post("/activities", authenticateJWT, async (req, res) => {
+app.post("/activities", authenticateJWT, (req, res) => {
   const activity = { ...req.body, userEmail: req.user.email };
-  const result = await activityCollection.insertOne(activity);
-  res.json(result);
+  activityCollection.insertOne(activity)
+    .then(result => res.json(result))
+    .catch(error => res.status(500).json({ error: error.message }));
 });
 
-app.delete("/activities/:id", async (req, res) => {
+app.delete("/activities/:id", (req, res) => {
   const { id } = req.params;
-  const result = await activityCollection.deleteOne({ _id: new ObjectId(id) });
-  res.json(result);
+  activityCollection.deleteOne({ _id: new ObjectId(id) })
+    .then(result => res.json(result))
+    .catch(error => res.status(500).json({ error: error.message }));
 });
 
-app.delete("/activities", async (req, res) => {
-  const result = await activityCollection.deleteMany({});
-  res.json(result);
+app.delete("/activities", (req, res) => {
+  activityCollection.deleteMany({})
+    .then(result => res.json(result))
+    .catch(error => res.status(500).json({ error: error.message }));
 });
 
 // JWT endpoint
